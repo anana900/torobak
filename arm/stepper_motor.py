@@ -40,15 +40,13 @@ class StepperMotorControl:
                  sm_sensor = None, \
                  sm_event_on_sensor = None, \
                  acc_time_low = 0.006, \
-                 acc_time_high = 0.002, \
-                 acc_time_resol = 0.0002):
+                 acc_time_high = 0.002):
         self.sm = sm
         self.gpio = gpio
         self.sm_sensor = sm_sensor
         self.sm_event_on_sensor = sm_event_on_sensor
         self.acc_time_low = acc_time_low
         self.acc_time_high = acc_time_high
-        self.acc_time_resol = acc_time_resol
         self.acc_time_current = self.acc_time_low
 
     def _smc_set_direction(self, direction):
@@ -60,44 +58,70 @@ class StepperMotorControl:
         self.gpio.output(self.sm.port_step, self.gpio.LOW)
         time.sleep(wait)
 
-    def _get_sm_ramp_up(self):
-        return int((self.acc_time_low - self.acc_time_high) / self.acc_time_resol)
+    def smc_ramp_up(self, nr_kroku, opoznienie):
+        '''
+        Opracowane na podstawie http://ww1.microchip.com/downloads/en/AppNotes/doc8017.pdf
+        '''
+        nastepne_opoznienie = opoznienie - (2 * opoznienie / (4 * nr_kroku + 1))
+        return nastepne_opoznienie
 
-    def _smc_accelerate(self, acc_type, no_of_steps):
-        while no_of_steps:
-            logger.debug("proc {} -sm-> {}".format(os.getpid(), self.acc_time_current))
-            self._smc_set_step(self.acc_time_current)
-            if acc_type == 1:
-                self.acc_time_current -= self.acc_time_resol
-            elif acc_type == -1:
-                self.acc_time_current += self.acc_time_resol
-            elif acc_type == 0:
-                pass
-            self.acc_time_current = round(self.acc_time_current, 5)
-            no_of_steps -= 1
+    def smc_ramp_down(self, nr_kroku, opoznienie):
+        '''
+        Opracowane na podstawie http://ww1.microchip.com/downloads/en/AppNotes/doc8017.pdf
+        '''
+        nastepne_opoznienie = (opoznienie * (4 * nr_kroku + 1)) / (4 * nr_kroku - 1)
+        return nastepne_opoznienie
 
-    def smc_move(self, direction, no_of_steps):
-        self._smc_set_direction(direction)
+    def smc_read_sensor(self, sm_sensor_no):
+        if self.gpio.input(sm_sensor_no) == self.gpio.HIGH:
+            logging.info("Reached End")
+            return True
+        return False
 
-        self.add_odd_step = 0
-        if no_of_steps % 2:
-            self.add_odd_step = 1
+    def smc_move(self, kierunek, ilosc_krokow_do_wykonania):
+        '''
+        Ustawienie kierunku i wykonanie zadanej liczby kroków
+        Funkcja wykożystuje 2 medoty:
+        - smc_ramp_up - oblicza opoznienie czasowe dla przyspieszenia
+        - smc_ramp_down - oblicza opoznienie czasowe dla zwolnienia
+        '''
+        # ustaw kierunek obrotow silnika
+        self._smc_set_direction(kierunek)
 
-        self.no_of_steps_half = no_of_steps // 2
+        polowa_krokow = ilosc_krokow_do_wykonania // 2
+        nr_kroku = 0
 
-        if self.no_of_steps_half >= 0:
-            if self._get_sm_ramp_up() <= self.no_of_steps_half:
-                logger.debug("Stepper acc fast")
-                self._smc_accelerate(1, self._get_sm_ramp_up())
-                self._smc_accelerate(0, no_of_steps - self._get_sm_ramp_up() * 2)
-                self._smc_accelerate(-1, self._get_sm_ramp_up())
+        if ilosc_krokow_do_wykonania > 0:
+            flaga_czy_przyspieszamy = 1
+            opoznienie = 0
 
-            elif self._get_sm_ramp_up() > self.no_of_steps_half:
-                logger.debug("Stepper acc slow")
-                self._smc_accelerate(1, self.no_of_steps_half)
-                self._smc_accelerate(-1, self.no_of_steps_half + self.add_odd_step)
+            # glowna petla - iterowanie po zadanej liczbie krokow do wykonania
+            for krok in range(ilosc_krokow_do_wykonania):
+                
+                # ustawienie flagi decydujacej o przyspieszeniu lub zwolnieniu
+                if krok > polowa_krokow:
+                    flaga_czy_przyspieszamy = 0
 
-            self.acc_time_current = self.acc_time_low
+                # oblicznie opoznienia dla przyspiezsenia
+                if flaga_czy_przyspieszamy == 1:
+                    nr_kroku += 1
+                    opoznienie = self.smc_ramp_up(nr_kroku, opoznienie)  
+                # obliczanie opoznienia czasowego dla zwolnienia
+                elif flaga_czy_przyspieszamy == 0:
+                    nr_kroku -= 1
+                    opoznienie = self.smc_ramp_down(nr_kroku, opoznienie)
 
-        else:
-            logger.error("Incorrect data")
+                # wykonanie pierwszego kroku z najnizsza zdefiniowana predkoscia
+                if krok == 0:
+                    opoznienie = self.acc_time_low
+
+                # sprawdz czy opoznienie jest najmniejsze (najwieksza predkosc)
+                if opoznienie <= self.acc_time_high:
+                    logger.debug("step {}, counter {}, delay {}".format(krok, nr_kroku, self.acc_time_high))
+                    self._smc_set_step(self.acc_time_high)
+                else:
+                    logger.debug("step {}, counter {}, delay {}".format(krok, nr_kroku, round(opoznienie,7)))
+                    self._smc_set_step(round(opoznienie,7))
+
+        elif ilosc_krokow_do_wykonania < 0:
+            logger.error("Number of steps must be higher than 0, not {}".format(ilosc_krokow_do_wykonania))

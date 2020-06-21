@@ -23,7 +23,7 @@ import stepper_motor as sm
 import RPi.GPIO as GPIO
 
 PORT_O_SCARA_ARM1_DIR = 18					# BOARD pin 12
-PORT_O_STARA_ARM1_STEP = 27					# BOARD pin 13
+PORT_O_SCARA_ARM1_STEP = 27					# BOARD pin 13
 PORT_O_SCARA_ARM2_DIR = 22					# BOARD pin 15
 PORT_O_SCARA_ARM2_STEP = 23					# BOARD pin 16
 PORT_O_Z_ARM_DIR = 24						# BOARD pin 18
@@ -39,7 +39,7 @@ def prepare_ports():
     logger.debug("Setting device ports")
     GPIO.setmode(GPIO.BCM)
     GPIO.setup(PORT_O_SCARA_ARM1_DIR, GPIO.OUT, initial=GPIO.LOW)
-    GPIO.setup(PORT_O_STARA_ARM1_STEP, GPIO.OUT, initial=GPIO.LOW)
+    GPIO.setup(PORT_O_SCARA_ARM1_STEP, GPIO.OUT, initial=GPIO.LOW)
     GPIO.setup(PORT_O_SCARA_ARM2_DIR, GPIO.OUT, initial=GPIO.LOW)
     GPIO.setup(PORT_O_SCARA_ARM2_STEP, GPIO.OUT, initial=GPIO.LOW)
     GPIO.setup(PORT_O_Z_ARM_DIR, GPIO.OUT, initial=GPIO.LOW)
@@ -58,9 +58,9 @@ def main():
     prepare_ports()
     try:
         stepper_motor_scara_1 = sm.StepperMotor(PORT_O_SCARA_ARM1_DIR, \
-                                                PORT_O_SCARA_ARM1_DIR, 1.8)
+                                                PORT_O_SCARA_ARM1_STEP, 1.8)
         stepper_motor_scara_2 = sm.StepperMotor(PORT_O_SCARA_ARM2_DIR, \
-                                                PORT_O_SCARA_ARM2_DIR, 1.8)
+                                                PORT_O_SCARA_ARM2_STEP, 1.8)
         stepper_motor_scara_1_sensor = sm.StepperMotorSensor(PORT_I_SCARA_ARM1_SENSOR_TOP, \
                                                                 PORT_I_SCARA_ARM1_SENSOR_BOTTOM)
         stepper_motor_scara_2_sensor = sm.StepperMotorSensor(PORT_I_SCARA_ARM2_SENSOR_TOP, \
@@ -70,16 +70,14 @@ def main():
                                                                 GPIO,\
                                                                 stepper_motor_scara_1_sensor,\
                                                                 None,\
-                                                                0.0058,\
-                                                                0.0007,\
-                                                                0.0002)
+                                                                0.004,\
+                                                                0.0002) # 0.006, 0.004
         
         stepper_motor_control_scara_arm2 = sm.StepperMotorControl(stepper_motor_scara_2,\
                                                                 GPIO,\
                                                                 stepper_motor_scara_2_sensor,\
                                                                 None,\
-                                                                0.0058,\
-                                                                0.0007,\
+                                                                0.004,\
                                                                 0.0002)
 
         #stepper_motor_control_z.smc_move(int(sys.argv[1]), int(sys.argv[2]))
