@@ -87,7 +87,8 @@ class ScaraArm:
 	def translate_scara_to_sm(self, sm_steps_per_resolution, out_from_calc_scara_angles):
 		'''
 		Metoda pobiera parametry:
-		1 ilosc krokow na 1 obrot dla danego silnika krokowego
+		1 ilosc krokow na 1 obrot ramienia dla danego silnika krokowego
+		  (liczona z uwzglednieniem zastosowanych przekladni)
 		2 katy z wyniku dzialania metody calc_scara_angles
 		
 		nastepnie dokonuje przeksztalcen w celu uzyskania dla kazdego silnika

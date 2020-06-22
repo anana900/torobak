@@ -7,11 +7,11 @@ import logging
 import time
 import os
 
-import br_logging as lg
+import logger as lg
 logger = lg.mylogger(__name__)
 
-import br_scara_arm as sa
-import br_stepper_motor as sm
+import scara_calc_simple as sa
+import stepper_motor as sm
 
 #mp.set_start_method('spawn')
 

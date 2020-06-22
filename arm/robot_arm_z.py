@@ -46,9 +46,15 @@ def main(argv):
 								GPIO,\
 								stepper_motor_z_sensor,\
 								None,\
-								0.0052,\
-								0.0002,\
-								0.0001)
+								0.0015,\
+								0.0002)
+        '''
+        Model silnika            Opoznienie min          Opoznienie max
+        NMB PM-42L 7.5deg        0.006 - 0.008           0.0015
+        A8694121A 1.8deg         0.0015                  0.0002
+                                 0.01                    0.002
+        '''
+
         #stepper_motor_control_z.smc_move(int(sys.argv[1]), int(sys.argv[2]))
         p1 = mp.Process(target=stepper_motor_control_z.smc_move, args=(int(sys.argv[1]), int(sys.argv[2])))
         p1.start()

@@ -58,14 +58,14 @@ class StepperMotorControl:
         self.gpio.output(self.sm.port_step, self.gpio.LOW)
         time.sleep(wait)
 
-    def smc_ramp_up(self, nr_kroku, opoznienie):
+    def _smc_ramp_up(self, nr_kroku, opoznienie):
         '''
         Opracowane na podstawie http://ww1.microchip.com/downloads/en/AppNotes/doc8017.pdf
         '''
         nastepne_opoznienie = opoznienie - (2 * opoznienie / (4 * nr_kroku + 1))
         return nastepne_opoznienie
 
-    def smc_ramp_down(self, nr_kroku, opoznienie):
+    def _smc_ramp_down(self, nr_kroku, opoznienie):
         '''
         Opracowane na podstawie http://ww1.microchip.com/downloads/en/AppNotes/doc8017.pdf
         '''
@@ -82,8 +82,8 @@ class StepperMotorControl:
         '''
         Ustawienie kierunku i wykonanie zadanej liczby kroków
         Funkcja wykożystuje 2 medoty:
-        - smc_ramp_up - oblicza opoznienie czasowe dla przyspieszenia
-        - smc_ramp_down - oblicza opoznienie czasowe dla zwolnienia
+        - _smc_ramp_up - oblicza opoznienie czasowe dla przyspieszenia
+        - _smc_ramp_down - oblicza opoznienie czasowe dla zwolnienia
         '''
         # ustaw kierunek obrotow silnika
         self._smc_set_direction(kierunek)
@@ -105,11 +105,11 @@ class StepperMotorControl:
                 # oblicznie opoznienia dla przyspiezsenia
                 if flaga_czy_przyspieszamy == 1:
                     nr_kroku += 1
-                    opoznienie = self.smc_ramp_up(nr_kroku, opoznienie)  
+                    opoznienie = self._smc_ramp_up(nr_kroku, opoznienie)  
                 # obliczanie opoznienia czasowego dla zwolnienia
                 elif flaga_czy_przyspieszamy == 0:
                     nr_kroku -= 1
-                    opoznienie = self.smc_ramp_down(nr_kroku, opoznienie)
+                    opoznienie = self._smc_ramp_down(nr_kroku, opoznienie)
 
                 # wykonanie pierwszego kroku z najnizsza zdefiniowana predkoscia
                 if krok == 0:
