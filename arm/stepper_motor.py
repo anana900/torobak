@@ -11,12 +11,14 @@ class StepperMotor:
     Reprezentacja silnika krokowego
     '''
     def __init__(self, \
+                 motor_name, \
                  port_dir, \
                  port_step, \
                  motor_deg_step):
+        self.name = motor_name
         self.port_dir = port_dir
         self.port_step = port_step
-        self.motor_deg_step = motor_deg_step
+        self.deg_step = motor_deg_step
 
 class StepperMotorSensor:
     '''
@@ -73,12 +75,12 @@ class StepperMotorControl:
         return nastepne_opoznienie
 
     def smc_read_sensor(self, sm_sensor_no):
-        if self.gpio.input(sm_sensor_no) == self.gpio.HIGH:
-            logging.info("Reached End")
+        if self.gpio.input(sm_sensor_no.sms_a) == self.gpio.LOW:
+            logger.debug("{} Reached End".format(self.sm.name))
             return True
         return False
 
-    def smc_move(self, kierunek, ilosc_krokow_do_wykonania):
+    def smc_move(self, kierunek, ilosc_krokow_do_wykonania, wiadomosc, wiadomosc_lock):
         '''
         Ustawienie kierunku i wykonanie zadanej liczby kroków
         Funkcja wykożystuje 2 medoty:
@@ -97,7 +99,21 @@ class StepperMotorControl:
 
             # glowna petla - iterowanie po zadanej liczbie krokow do wykonania
             for krok in range(ilosc_krokow_do_wykonania):
-                
+
+                # czytaj wiadomosc, jesli inny silnik zatrzymal prace tez przerwij
+                if wiadomosc != 0:
+                    if wiadomosc == -1:
+                        logger.debug("{} Odbierz wiadomosc, czujnik krancowy. Konczy prace".format(self.sm.name))
+                        break
+
+                # czytaj czujniki, jesli krancowka zwarta wyslij wiadomosc i zakoncz program
+                if self.smc_read_sensor(self.sm_sensor):
+                    logger.debug("{} Wyslij wiadomosc czujnik krancowy. Koncz prace".format(self.sm.name))
+                    wiadomosc_lock.acquire()
+                    wiadomosc = -1
+                    wiadomosc_lock.release()
+                    break
+
                 # ustawienie flagi decydujacej o przyspieszeniu lub zwolnieniu
                 if krok > polowa_krokow:
                     flaga_czy_przyspieszamy = 0
@@ -117,11 +133,11 @@ class StepperMotorControl:
 
                 # sprawdz czy opoznienie jest najmniejsze (najwieksza predkosc)
                 if opoznienie <= self.acc_time_high:
-                    logger.debug("step {}, counter {}, delay {}".format(krok, nr_kroku, self.acc_time_high))
+                    logger.debug("{} step {}, counter {}, delay {}".format(self.sm.name, krok, nr_kroku, self.acc_time_high))
                     self._smc_set_step(self.acc_time_high)
                 else:
-                    logger.debug("step {}, counter {}, delay {}".format(krok, nr_kroku, round(opoznienie,7)))
+                    logger.debug("{} step {}, counter {}, delay {}".format(self.sm.name, krok, nr_kroku, round(opoznienie,7)))
                     self._smc_set_step(round(opoznienie,7))
 
         elif ilosc_krokow_do_wykonania < 0:
-            logger.error("Number of steps must be higher than 0, not {}".format(ilosc_krokow_do_wykonania))
+            logger.error("{} Number of steps must be higher than 0, not {}".format(self.sm.name, ilosc_krokow_do_wykonania))

@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-from multiprocessing import Process
 import multiprocessing as mp
 import logging
 import time
@@ -44,63 +43,69 @@ def prepare_ports():
     GPIO.setup(PORT_O_SCARA_ARM2_STEP, GPIO.OUT, initial=GPIO.LOW)
     GPIO.setup(PORT_O_Z_ARM_DIR, GPIO.OUT, initial=GPIO.LOW)
     GPIO.setup(PORT_O_Z_ARM_STEP, GPIO.OUT, initial=GPIO.LOW)
+    
+    GPIO.setup(PORT_I_SCARA_ARM1_SENSOR_TOP, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+    GPIO.setup(PORT_I_SCARA_ARM2_SENSOR_TOP, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
 def clean_ports():
     logger.debug("Cleaning device ports")
     GPIO.cleanup()
 
-def proces_sm(arm, dir, step):
-	#logger.debug("arm {} dir {} step {}".format(arm, dir, step))
-	p = Process(target=sm_move, args=(arm, dir, step))
-	return p
-
 def main():
     prepare_ports()
+    
+    wiadomosc = mp.Value('i', 0)
+    wiadomosc_lock = mp.Lock()
+    
     try:
         # definiowanie ramienia SCARA: R1 20cm, R2 20cm
         scara_arm = sa.ScaraArm(20,20)
 
         # zdefiniowanie silnikow krokowych dla ramienia SCARA
-        stepper_motor_scara_1 = sm.StepperMotor(PORT_O_SCARA_ARM1_DIR, \
+        stepper_motor_scara_1 = sm.StepperMotor("scara ramie 1", \
+                                                PORT_O_SCARA_ARM1_DIR, \
                                                 PORT_O_SCARA_ARM1_STEP, 1.8)
-        stepper_motor_scara_2 = sm.StepperMotor(PORT_O_SCARA_ARM2_DIR, \
+        stepper_motor_scara_2 = sm.StepperMotor("scara ramie 2", \
+                                                PORT_O_SCARA_ARM2_DIR, \
                                                 PORT_O_SCARA_ARM2_STEP, 1.8)
         # zdefiniowanie czujnikow krancowych dla amienie SCARA
         stepper_motor_scara_1_sensor = sm.StepperMotorSensor(PORT_I_SCARA_ARM1_SENSOR_TOP, \
                                                                 PORT_I_SCARA_ARM1_SENSOR_BOTTOM)
-        stepper_motor_scara_2_sensor = sm.StepperMotorSensor(PORT_I_SCARA_ARM2_SENSOR_TOP, \
+        stepper_motor_scara_2_sensor = sm.StepperMotorSensor(PORT_I_SCARA_ARM1_SENSOR_TOP, \
                                                                 PORT_I_SCARA_ARM2_SENSOR_BOTTOM)
+
         # stworzenie metod kontrolnych silników poszczególnych ramion
         stepper_motor_control_scara_arm1 = sm.StepperMotorControl(stepper_motor_scara_1,\
                                                                 GPIO,\
                                                                 stepper_motor_scara_1_sensor,\
                                                                 None,\
-                                                                0.0004,\
-                                                                0.0004) # 0.006, 0.004
+                                                                0.0016,\
+                                                                0.0002) # 0.006, 0.004
         
         stepper_motor_control_scara_arm2 = sm.StepperMotorControl(stepper_motor_scara_2,\
                                                                 GPIO,\
                                                                 stepper_motor_scara_2_sensor,\
                                                                 None,\
-                                                                0.0004,\
-                                                                0.0004)
+                                                                0.0008,\
+                                                                0.0002)
 
-        #stepper_motor_control_z.smc_move(int(sys.argv[1]), int(sys.argv[2]))
         while True:
+            print("Number of cpu : ", mp.cpu_count())
             x = input()
             y = input()
             if x == 'x' or y == 'x':
                 break
+
             dane_r1_r2 = scara_arm.translate_scara_to_sm(3600, scara_arm.calc_scara_angles(int(x),int(y)))
-            p1 = mp.Process(target=stepper_motor_control_scara_arm1.smc_move, args=(dane_r1_r2[0], dane_r1_r2[1]))
-            p2 = mp.Process(target=stepper_motor_control_scara_arm2.smc_move, args=(dane_r1_r2[2], dane_r1_r2[3]))
+            p1 = mp.Process(target=stepper_motor_control_scara_arm1.smc_move, args=(dane_r1_r2[0], dane_r1_r2[1], wiadomosc, wiadomosc_lock))
+            p2 = mp.Process(target=stepper_motor_control_scara_arm2.smc_move, args=(dane_r1_r2[2], dane_r1_r2[3], wiadomosc, wiadomosc_lock))
             
             #p1 = mp.Process(target=stepper_motor_control_scara_arm1.smc_move, args=(int(sys.argv[1]), int(sys.argv[2])))
             #p2 = mp.Process(target=stepper_motor_control_scara_arm2.smc_move, args=(int(sys.argv[3]), int(sys.argv[4])))
             p1.start()
-            p2.start()
+            #p2.start()
             p1.join()
-            p2.join()
+            #p2.join()
         
     finally:
         clean_ports()
