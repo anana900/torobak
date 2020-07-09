@@ -44,6 +44,18 @@ class ScaraArm:
 
 		return int(self.arm_angle)
 
+	def calc_scara_angles_middle(self, x, y, init_x = 0, init_y = 0):
+		mx = self.current_x
+		my = self.current_y
+
+		if mx == None or my == None:
+			mx = init_x
+			my = init_y
+
+		mx = int((x + mx)/2)
+		my = int((y + my)/2)
+		return self.calc_scara_angles(mx, my)
+
 	def calc_scara_angles(self, x, y):
 		self.new_angle_r1 = 0
 		self.new_angle_r2 = 0
@@ -84,7 +96,7 @@ class ScaraArm:
 			logger.warning("Cannot determine angles for x:{} y:{}".format(x, y))
 			return (None, None)
 		
-	def translate_scara_to_sm(self, sm_steps_per_resolution, out_from_calc_scara_angles):
+	def translate_scara_to_sm(self, sm_steps_per_resolution, out_from_calc_scara_angles1, out_from_calc_scara_angles2=(None, None)):
 		'''
 		Metoda pobiera parametry:
 		1 ilosc krokow na 1 obrot ramienia dla danego silnika krokowego
@@ -97,22 +109,36 @@ class ScaraArm:
 		1 kierunek obrotow
 		2 ilosc krokow do wykonania w celu przesuniecia o zadany kat
 		'''
-		direction1, direction2 = 0, 0
-		angle1, angle2 = out_from_calc_scara_angles
+		direction11, direction12, direction21, direction22 = 0, 0, 0, 0
+		angle11, angle12 = out_from_calc_scara_angles1
+		angle21, angle22 = out_from_calc_scara_angles2
 		single_step = float(360/sm_steps_per_resolution)
 	
-		if angle1 == None:
-			angle1 = 0
-		elif angle1 < 0:
-			direction1 = 1
+		if angle11 == None:
+			angle11 = 0
+		elif angle11 < 0:
+			direction11 = 1
+
+		if angle12 == None:
+			angle12 = 0
+		elif angle12 < 0:
+			direction12 = 1
+
+
+		if angle21 == None:
+			angle21 = 0
+		elif angle21 < 0:
+			direction21 = 1
 			
-		if angle2 == None:
-			angle2 = 0
-		elif angle2 < 0:
-			direction2 = 1
-	
-		return (direction1, int(abs(angle1) / single_step), \
-			direction2, int(abs(angle2) / single_step))
+		if angle22 == None:
+			angle22 = 0
+		elif angle22 < 0:
+			direction22 = 1
+
+		return (direction11, int(abs(angle11) / single_step), \
+			direction12, int(abs(angle12) / single_step), \
+			direction21, int(abs(angle21) / single_step), \
+			direction22, int(abs(angle22) / single_step))
 
 class ScaraArmTest(unittest.TestCase):
 	def setUp(self):

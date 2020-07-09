@@ -86,7 +86,7 @@ def main():
                                                                 GPIO,\
                                                                 stepper_motor_scara_2_sensor,\
                                                                 None,\
-                                                                0.0008,\
+                                                                0.0016,\
                                                                 0.0002)
 
         while True:
@@ -96,17 +96,19 @@ def main():
             if x == 'x' or y == 'x':
                 break
 
-            dane_r1_r2 = scara_arm.translate_scara_to_sm(3600, scara_arm.calc_scara_angles(int(x),int(y)))
-            p1 = mp.Process(target=stepper_motor_control_scara_arm1.smc_move, args=(dane_r1_r2[0], dane_r1_r2[1], wiadomosc, wiadomosc_lock))
-            p2 = mp.Process(target=stepper_motor_control_scara_arm2.smc_move, args=(dane_r1_r2[2], dane_r1_r2[3], wiadomosc, wiadomosc_lock))
-            
-            #p1 = mp.Process(target=stepper_motor_control_scara_arm1.smc_move, args=(int(sys.argv[1]), int(sys.argv[2])))
-            #p2 = mp.Process(target=stepper_motor_control_scara_arm2.smc_move, args=(int(sys.argv[3]), int(sys.argv[4])))
+            #dane_r1_r2 = scara_arm.translate_scara_to_sm(3600, scara_arm.calc_scara_angles(int(x),int(y)))
+            #p1 = mp.Process(target=stepper_motor_control_scara_arm1.smc_move, args=(dane_r1_r2[0], dane_r1_r2[1], wiadomosc, wiadomosc_lock))
+            #p2 = mp.Process(target=stepper_motor_control_scara_arm2.smc_move, args=(dane_r1_r2[2], dane_r1_r2[3], wiadomosc, wiadomosc_lock))
+
+            dane_r1_r2 = scara_arm.translate_scara_to_sm(3600, scara_arm.calc_scara_angles_middle(int(x),int(y)), scara_arm.calc_scara_angles(int(x),int(y)))
+            p1 = mp.Process(target=stepper_motor_control_scara_arm1.smc_move_scara, args=(dane_r1_r2[0], dane_r1_r2[1], dane_r1_r2[2], dane_r1_r2[3], wiadomosc, wiadomosc_lock))
+            p2 = mp.Process(target=stepper_motor_control_scara_arm2.smc_move_scara, args=(dane_r1_r2[4], dane_r1_r2[5], dane_r1_r2[6], dane_r1_r2[7], wiadomosc, wiadomosc_lock))
+
             p1.start()
-            #p2.start()
+            p2.start()
             p1.join()
-            #p2.join()
-        
+            p2.join()
+
     finally:
         clean_ports()
 

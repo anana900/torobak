@@ -141,3 +141,19 @@ class StepperMotorControl:
 
         elif ilosc_krokow_do_wykonania < 0:
             logger.error("{} Number of steps must be higher than 0, not {}".format(self.sm.name, ilosc_krokow_do_wykonania))
+
+    def smc_move_scara(self, kierunek1, ilosc_krokow_do_wykonania1, kierunek2, ilosc_krokow_do_wykonania2, wiadomosc, wiadomosc_lock):
+        '''
+        Zmodyfikowana wersja smc_move pozwalająca na przechodzenie przez środkowy punkt trasy.
+        W ten sposób ramie przemieszcza się po krótszej lini i unikamy kolizji z miejscami zabronionymi.
+        '''
+        # ustaw kierunek obrotow silnika
+        if kierunek1 == kierunek2:
+            self._smc_set_direction(kierunek1)
+            ilosc_krokow_do_wykonania = ilosc_krokow_do_wykonania1 + ilosc_krokow_do_wykonania2
+            self.smc_move(kierunek1, ilosc_krokow_do_wykonania, wiadomosc, wiadomosc_lock)
+
+        elif kierunek1 != kierunek2:
+            self.smc_move(kierunek1, ilosc_krokow_do_wykonania1, wiadomosc, wiadomosc_lock)
+            self.smc_move(kierunek2, ilosc_krokow_do_wykonania2, wiadomosc, wiadomosc_lock)
+
