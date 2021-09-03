@@ -107,7 +107,24 @@ class ScaraArm:
 		krokowego 2 pary parametrow potrzebnych na jego wysterowanie 
 		z wykozystaniem sterownika A4988 lub podobnego:
 		1 kierunek obrotow
-		2 ilosc krokow do wykonania w celu przesuniecia o zadany kat
+		2 ilosc krokow do wykonania w celu przesuniecia o zadany kat      
+		
+				 MOTOR ARM2             
+				 DIRECTION21            
+			     +-+ DIRECTION22            
+			     +-+                        
+			    /   \                       
+			   /     \                      
+			  /       \            --       
+		   ARM1  /         \ARM2                
+			/           \                   
+		       /             \                  
+		      /               \                 
+		     /                 \                
+		  +-+                   -               
+		  +-+MOTOR ARM1                         
+		     DIRECTION11                        
+		     DIRECTION12                        		
 		'''
 		direction11, direction12, direction21, direction22 = 0, 0, 0, 0
 		angle11, angle12 = out_from_calc_scara_angles1
