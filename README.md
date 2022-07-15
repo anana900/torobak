@@ -1,2 +1,5 @@
-# torobak
-experiment with SCARA type robot arm
+# Virtual environment
+python -m venv venv
+source venv/bin/activate
+deactivate
+
