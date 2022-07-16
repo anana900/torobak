@@ -1,0 +1,18 @@
+@startuml
+(*) --> "Zmien pozycje glowicy zgodnie z algorytmem"
+"Zmien pozycje glowicy zgodnie z algorytmem" -> "Szukaj obiektu"
+
+if "nowy obiekt?" then
+  -->[tak] "Sprawdz odleglosc"
+    --> if "odleglosc poprawna"
+           -->[tak] "Poberz obiekt"
+           --> "KONIEC"
+        else
+           -->[nie] "Zmiana odleglosci - przybliż lub oddal"
+           -up-> "Szukaj obiektu"
+        endif
+else
+  -up->[nie] "Zmien pozycje glowicy zgodnie z algorytmem"
+endif
+
+@enduml
