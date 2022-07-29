@@ -1,6 +1,11 @@
+"""
+Sprawdzenie możliwości sterowania małymi serwomechanizmami z wykożystaniem PCA9685.
+Serwomechanizmy to 5V MG90S.
+"""
 # https://circuitpython.readthedocs.io/projects/servokit/en/latest/
 import time
 
+import RPi.GPIO as GPIO
 from adafruit_servokit import ServoKit
 
 # dla MG90s czasy dla PWD wynoszą od 500us do 2500us, zakres 180, czas przejscia od 0 do 180 300ms
@@ -18,7 +23,7 @@ def konfiguracja_pca() -> None:
 
 def test_pca() -> None:
     kat_skok = 1
-    oponienie_s = 0.002
+    opoznienie_s = 0.002
     for i in range(nbPCAServo):
         print(f"Sprawdzenie ze skokiem {kat_skok}")
         i = 0
@@ -29,6 +34,25 @@ def test_pca() -> None:
             pca.servo[i].angle = j
             time.sleep(opoznienie_s)
         pca.servo[i].angle=None # disable channel
+        time.sleep(3)
+
+def test_pca_multiple() -> None:
+    kat_skok = 1
+    opoznienie_s = 0.002
+    for i in range(nbPCAServo):
+        print(f"Sprawdzenie ze skokiem {kat_skok}")
+        serwo_0 = 0
+        serwo_1 = 1
+        for j in range(MIN_ANG[i], MAX_ANG[i], kat_skok):
+            pca.servo[serwo_0].angle = j
+            pca.servo[serwo_1].angle = j
+            time.sleep(opoznienie_s)
+        for j in range(MAX_ANG[i], MIN_ANG[i], -kat_skok):
+            pca.servo[serwo_0].angle = j
+            pca.servo[serwo_1].angle = j
+            time.sleep(opoznienie_s)
+        pca.servo[serwo_0].angle=None # disable channel
+        pca.servo[serwo_1].angle=None # disable channel
         time.sleep(3)
 
 def chwytak(zacisnij_bool: bool) -> None:
@@ -56,6 +80,15 @@ def test_chwytak() -> None:
             print(counter_single_move)
 
 if __name__ == '__main__':
-    konfiguracja_pca()
-    #test_pca()
-    test_chwytak()
+    try:
+        konfiguracja_pca()
+        #test_pca()
+        test_pca_multiple()
+        #test_chwytak()
+    except KeyboardInterrupt:
+        print("Zakonczenie poprzez ctrl+c")
+    except Exception as unknown_exception:
+        print(f"To nie powinno sie wydarzyc! {unknown_exception}")
+    finally:
+        print("Czyszczenie GPIO")
+        GPIO.cleanup()
