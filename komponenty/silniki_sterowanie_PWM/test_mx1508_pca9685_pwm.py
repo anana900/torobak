@@ -1,11 +1,16 @@
 """
 Sprawdzenie sterowanie silnikiem DC poprzez PWM.
-Jako sterownik silnika został użyty MX1508, do niego podłączony mały silniczek DC.
+Jako sterownik silnika został użyty MX1508 oraz TA6586, do niego podłączony mały silniczek DC.
 MX1508 sterowany jest z 2 kanałów PWM (lewo, prawo) z układu PCA9685.
 
 Sprawdzone zostały 2 metody sterowania:
 1 zmian wartości angle - tak jek to jest robione w serwomechanizmach.
-2 zmiana wartości throttle z klasy continous servo bibliteki ServoKit. 
+2 zmiana wartości throttle z klasy continous servo bibliteki ServoKit.
+
+TA6586 - do 5A w pracy ciągłej, 12V, 1 kanał. Płytka testowa posiada 2 układy, 2 kanały.
+Sterowanie poprzez 2 piny PWM prawo/lewo.
+MX1508 - do 1A w pracy ciągłem 9V , 2 kanały. Płytka testowa posiada 1 układ, 2 kanały.
+Sterowanie poprzez 2 piny PWM prawo/lewo.
 """
 
 import time
@@ -55,7 +60,7 @@ def test_silnik_dc_2_throttle(port_lewo: int, port_prawo: int,
     pca.continuous_servo[port_lewo].set_pulse_width_range(min_szerokosc_pulsu_us, max_szerokosc_pulsu_us)
     pca.continuous_servo[port_prawo].set_pulse_width_range(min_szerokosc_pulsu_us, max_szerokosc_pulsu_us)
 
-    bezwladnosc_czasowa_s = 0.1
+    bezwladnosc_czasowa_s = 0.075
     # throttle akceptuje wartosci od -1.0 do 1.0, ale na cele uzycia w range zmieniam skale
     # od -10 do +10 z krokiem 1
     przyspieszenie_start = 0    # -10 - 10
@@ -67,16 +72,26 @@ def test_silnik_dc_2_throttle(port_lewo: int, port_prawo: int,
             # Petla przyspieszenia lewo
             pca.continuous_servo[port_lewo].throttle = i/przyspieszenie_dzielnik
             time.sleep(bezwladnosc_czasowa_s)
+        time.sleep(1)
+        for i in range(przyspieszenie_stop, przyspieszenie_start-1, -przyspieszenie_krok):
+            # Petla przyspieszenia lewo
+            pca.continuous_servo[port_lewo].throttle = i/przyspieszenie_dzielnik
+            time.sleep(bezwladnosc_czasowa_s)
         pca.continuous_servo[port_lewo].throttle = -1
         print("Lewo ok")
-        time.sleep(1)
+        #time.sleep(1)
         for i in range(przyspieszenie_start, przyspieszenie_stop+1, przyspieszenie_krok):
             # Petla przyspieszenia prawo
             pca.continuous_servo[port_prawo].throttle = i/przyspieszenie_dzielnik
             time.sleep(bezwladnosc_czasowa_s)
+        time.sleep(1)
+        for i in range(przyspieszenie_stop, przyspieszenie_start-1, -przyspieszenie_krok):
+            # Petla przyspieszenia lewo
+            pca.continuous_servo[port_prawo].throttle = i/przyspieszenie_dzielnik
+            time.sleep(bezwladnosc_czasowa_s)
         print("Prawo ok")
         pca.continuous_servo[port_prawo].throttle = -1
-        time.sleep(1)
+        #time.sleep(1)
 
 def pca_cleanup(port_lewo: int, port_prawo: int):
     """
