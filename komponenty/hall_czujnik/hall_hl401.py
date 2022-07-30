@@ -30,8 +30,6 @@ Rozpiska wyprowadzeń RPI3
  +-----+-----+---------+------+---+---Pi 3---+---+------+---------+-----+-----+
 https://www.dummies.com/article/technology/computers/hardware/raspberry-pi/raspberry-pi-gpio-pin-alternate-functions-143761/
 """
-import time
-
 import RPi.GPIO as GPIO
 
 HALL_BCM = 21
@@ -41,19 +39,24 @@ GPIO.setmode(GPIO.BCM)
 GPIO.setup(HALL_BCM, GPIO.IN)
 
 def test_hall_hl401():
-    stan_poprzedni = 0
-    stan_aktualny = 0
+    """
+    Idea polega na zliczaniu zboczy opadających 1 -> 0.
+    Czujnik Hall'a podłączony jest do portu GPIO ustawionego jako wejście.
+    Pomocnicza zmienna hall_status_aktualny trzyma informację o aktualnym
+    stanie wejścia. Jeśli nastąpi zmiana z 1 -> 0 wówczas zaliczany jest
+    impuls. W przypadku braku zmiany 0 -> 0, lub 1 -> 1 sprawdzanie stanu
+    GPIO jest kontunuowane. 
+    """
+    hall_status_aktualny = 0
     licznik = 0
     while True:
-        if GPIO.input(HALL_BCM) == 0:
-            if stan_poprzedni != stan_aktualny:
-                stan_poprzedni = stan_aktualny
-                stan_aktualny = 0
+        hall_status = GPIO.input(HALL_BCM)
+        if hall_status == 0 and hall_status_aktualny == 1:
+                hall_status_aktualny = hall_status
                 licznik += 1
                 print(f"puls {licznik}")
-        else:
-            stan_poprzedni = stan_aktualny
-            stan_aktualny = 1
+        elif hall_status == 1 and hall_status_aktualny == 0:
+                hall_status_aktualny = hall_status
 
 if __name__=='__main__':
     try:
