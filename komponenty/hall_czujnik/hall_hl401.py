@@ -1,6 +1,11 @@
 """
 Testowanie czujnika hall'a w celu zastosowania go do odczytywania ilości obrótów w silnikach DC.
 
+Obserwacja: czujnik w zależności od położenia/ sposobu przesunięcia magnesu może zmienić permamentnie
+z 0 na 1 lub z 1 na 0. Możliwe że magnes kórego używam wytwarza podówje pole które generuje 2 impulsy,
+ale czasami wygeneruje tylko 1 podczas przesunięcia i obserwowany jest taki efekt. Do sprawdzenia z
+innymi magnesami.
+
 Rozpiska wyprowadzeń RPI3
  +-----+-----+---------+------+---+---Pi 3---+---+------+---------+-----+-----+
  | BCM | wPi |   Name  | Mode | V | Physical | V | Mode | Name    | wPi | BCM |
@@ -36,7 +41,7 @@ HALL_BCM = 21
 # BCM - opisy pinów zgodnie z płytką
 # BOARD - opisy pinów zgodnie z wyprowadzeniami procesora
 GPIO.setmode(GPIO.BCM)
-GPIO.setup(HALL_BCM, GPIO.IN)
+GPIO.setup(HALL_BCM, GPIO.IN)   #, pull_up_down=GPIO.PUD_DOWN)
 
 def test_hall_hl401():
     """
