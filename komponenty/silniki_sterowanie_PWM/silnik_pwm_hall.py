@@ -50,25 +50,39 @@ def silnik_pwm(port_lewo: int, port_prawo: int, kierunek, zadane_obroty_lock) ->
     przyspieszenie_krok = 2     # > 0
     przyspieszenie_dzielnik = 10
 
+    # tworzenie tablicy przyśpieszenia
+    # wartości muszą być dobrane pod dany silnik
+    obroty = 1
+    przyspieszenie = []
+    with zadane_obroty_lock:
+        obroty = zadane_obroty
+    if obroty < 20:
+        przyspieszenie = [0.1 for _ in range(obroty)]
+    else:
+        przyspieszenie = [round(0.1*i, 1) for i in range(1, 10)]
+        przyspieszenie.extend([1 for _ in range(obroty-20)])
+        przyspieszenie.extend([round(1 - i/10, 1) for i in range(1, 10)])
+    print(przyspieszenie)
+
     while True:
         with zadane_obroty_lock:
-            print(f"silnik {zadane_obroty}")
-            if zadane_obroty <= 0:
-                break
+            obroty = zadane_obroty
+        print(f"silnik {zadane_obroty}")
+        if obroty <= 0:
+            break
         if kierunek:
-            pca.continuous_servo[port_lewo].throttle = 0.1
+            pca.continuous_servo[port_lewo].throttle = przyspieszenie[2-obroty]     # 2 do zoptymalizowania
         else:
-            pca.continuous_servo[port_prawo].throttle = 0.1
+            pca.continuous_servo[port_prawo].throttle = przyspieszenie[2-obroty]
         if event_stop.is_set():
             break
-        time.sleep(0.1)
+        time.sleep(0.5)
 
     pca.continuous_servo[port_lewo].throttle = -1
     pca.continuous_servo[port_prawo].throttle = -1
     print("konczymy watek silnik")
 
-
-zadane_obroty =5
+zadane_obroty =25
 def silnik_sterowanie() -> None:
     zadane_obroty_lock = Lock()
     try:
