@@ -23,6 +23,16 @@ Magnet --> |    A87L
              |
             gnd
 
+Złącze silnika rozpiska
+.2  .3  -5
+.1  .4  -6
+1 Vcc hall
+2 GND hall
+3 Out hall
+4 NC
+5 motor
+6 motor
+
 PROBLEM 1
 Okazuje się ze czytanie z czujnika halla jest bardzo powolne.
 Zmienia się w zaleznosci od przylozonego napiecia do ukladu sterownika.
@@ -37,6 +47,11 @@ Dla 5V
 PROBLEM 2
 Przy zasilaniu 12V sterownik nie wspolpracuje z silnikiem 12V poprawnie. Zdarza się to losowo.
 Jakby wzbudzenie. Wyłączenie zasilania na kilka s pomaga. Do sprawdzenia.
+Problem występuje też przy innych zasilaniach.
+Możliwe że to kwestia zkłeceń od silnika do sterownika. Po odsunięciu samego silnika problem ustał.
+
+PROBLEM 3
+Niedokładność przesunięcia silnika.
 """
 import time
 
@@ -69,23 +84,36 @@ def silnik_hall(zadane_obroty_lock) -> None:
     with zadane_obroty_lock:
        licznik = zadane_obroty
     while licznik > 0:
+        if licznik <=0 or event_stop.is_set():
+            break
         hall_status = GPIO.input(HALL_BCM)
         if hall_status == 0 and hall_status_aktualny == 1:
                 hall_status_aktualny = hall_status
                 with zadane_obroty_lock:
                     zadane_obroty -= 1
                     licznik = zadane_obroty
-                    print(f"licznik {licznik}")
+                    #print(f"licznik {licznik}")
         elif hall_status == 1 and hall_status_aktualny == 0:
                 hall_status_aktualny = hall_status
-        if event_stop.is_set():
-            break
     print("konczymy watek HALL")
 
 serwo_ilosc_kanalow = 16
 pca = ServoKit(channels = serwo_ilosc_kanalow)
 
 def silnik_pwm(port_lewo: int, port_prawo: int, kierunek, zadane_obroty_lock) -> None:
+    def oblicz_przyspieszenie(obroty: int, kroki: int=10) -> list:
+        # Tworzenie tablicy przyśpieszenia
+        # Wartości muszą być dobrane pod dany silnik
+        przyspieszenie = []
+        if obroty < 20:
+            przyspieszenie = [0.1 for _ in range(obroty)]
+        else:
+            przyspieszenie = [round(0.1 * i, 1) for i in range(1, 11)]
+            przyspieszenie.extend([1 for _ in range(obroty-20)])
+            przyspieszenie.extend([round(1 - i/10, 1) for i in range(0, 10)])
+        print(f"obroty {obroty} elementy {len(przyspieszenie)} {przyspieszenie}")
+        return przyspieszenie
+
     print("Start watek silnik")
     global zadane_obroty
 
@@ -100,31 +128,23 @@ def silnik_pwm(port_lewo: int, port_prawo: int, kierunek, zadane_obroty_lock) ->
     with zadane_obroty_lock:
         obroty = zadane_obroty
 
-    # Tworzenie tablicy przyśpieszenia
-    # Wartości muszą być dobrane pod dany silnik
-    przyspieszenie = []
-    if obroty < 20:
-        przyspieszenie = [0.1 for _ in range(obroty)]
-    else:
-        przyspieszenie = [round(0.1*i, 1) for i in range(1, 11)]
-        print(przyspieszenie)
-        przyspieszenie.extend([1 for _ in range(obroty-20)])
-        print(przyspieszenie)
-        przyspieszenie.extend([round(1 - i/10, 1) for i in range(1, 11)])
-    print(przyspieszenie)
-    print(len(przyspieszenie))
+    # Tablica przyspieszenia
+    przyspieszenie = oblicz_przyspieszenie(obroty)
 
     # Pętla silnika
     while obroty > 0:
         with zadane_obroty_lock:
             obroty = zadane_obroty
-        print(f"silnik {obroty}")
+        #print(f"silnik {obroty}")
         if obroty <= 0 or event_stop.is_set():
             break
         if kierunek:
             pca.continuous_servo[port_lewo].throttle = przyspieszenie[obroty - 1]
         else:
             pca.continuous_servo[port_prawo].throttle = przyspieszenie[obroty - 1]
+        # uśpienie na 1ms. Przy 12V częstotliwość zmiany sygnału z czujnika A78L ~200Hz co pozwala
+        # sprawdzić czujnik ok 5 razy zanim zmieni stan.
+        #time.sleep(0.001)
 
     # Zatrzymywanie silnika
     pca.continuous_servo[port_lewo].throttle = -1
@@ -133,14 +153,20 @@ def silnik_pwm(port_lewo: int, port_prawo: int, kierunek, zadane_obroty_lock) ->
 
 zadane_obroty = 21
 def silnik_sterowanie() -> None:
+    global zadane_obroty
+    kierunek = 0
     zadane_obroty_lock = Lock()
     try:
-        watek_silnik_czujnik_hall = Thread(target=silnik_hall, args=(zadane_obroty_lock,))
-        watek_silnik_pwm = Thread(target=silnik_pwm, args=(14, 15, 1, zadane_obroty_lock,))
-        watek_silnik_czujnik_hall.start()
-        watek_silnik_pwm.start()
-        watek_silnik_czujnik_hall.join()
-        watek_silnik_pwm.join()
+        while True:
+            kierunek = 0 if kierunek else 1
+            watek_silnik_czujnik_hall = Thread(target=silnik_hall, args=(zadane_obroty_lock,))
+            watek_silnik_pwm = Thread(target=silnik_pwm, args=(14, 15, kierunek, zadane_obroty_lock,))
+            watek_silnik_czujnik_hall.start()
+            watek_silnik_pwm.start()
+            watek_silnik_czujnik_hall.join()
+            watek_silnik_pwm.join()
+            time.sleep(0.2)
+            zadane_obroty = 21
     except KeyboardInterrupt:
         print("Zakonczenie poprzez ctrl+c")
         event_stop.set()
