@@ -35,6 +35,8 @@ Rozpiska wyprowadzeń RPI3
  +-----+-----+---------+------+---+---Pi 3---+---+------+---------+-----+-----+
 https://www.dummies.com/article/technology/computers/hardware/raspberry-pi/raspberry-pi-gpio-pin-alternate-functions-143761/
 """
+import time
+
 import RPi.GPIO as GPIO
 
 HALL_BCM = 21
@@ -57,15 +59,44 @@ def test_hall_hl401():
     while True:
         hall_status = GPIO.input(HALL_BCM)
         if hall_status == 0 and hall_status_aktualny == 1:
-                hall_status_aktualny = hall_status
-                licznik += 1
-                print(f"puls {licznik}")
+            hall_status_aktualny = hall_status
+            licznik += 1
+            print(f"puls {licznik}")
         elif hall_status == 1 and hall_status_aktualny == 0:
-                hall_status_aktualny = hall_status
+            hall_status_aktualny = hall_status
+
+def test_generator():
+    """
+    Test z generatorem sygnału.
+    Zlicznie impulsów generatora przez zadany okres czasu.
+    Dla 1s przy czestotliwości generatora 1kH powinno wyjść 1000 impulsów.
+    Najpierw uruchamiany jest generator pootem program.
+    Wyniki pomiarow dla prostokątnego sygnału dla 10 prób:
+    --------+--------
+    f       |  Błędy
+    --------+--------
+    2kHz    |   0
+    3kHz    |   1
+    10kHz   |   7
+    --------+--------
+    """
+    hall_status_aktualny = 0
+    licznik = 0
+    timer_start_ns = time.time_ns()
+    while time.time_ns() - timer_start_ns < 1e9:    # przez zadany okres np 1s zliczaj impulsy
+        hall_status = GPIO.input(HALL_BCM)
+        if hall_status == 0 and hall_status_aktualny == 1:
+            hall_status_aktualny = hall_status
+            licznik += 1
+        elif hall_status == 1 and hall_status_aktualny == 0:
+            hall_status_aktualny = hall_status
+
+    print(f"zliczone impulsy:{licznik} czas: {time.time_ns() - timer_start_ns} [ns]")
 
 if __name__=='__main__':
     try:
-        test_hall_hl401()
+        #test_hall_hl401()
+        test_generator()
     except KeyboardInterrupt:
         print("Zakonczenie poprzez ctrl+c")
     except Exception as unknown_exception:
@@ -73,4 +104,3 @@ if __name__=='__main__':
     finally:
         print("Czyszczenie GPIO")
         GPIO.cleanup()
-

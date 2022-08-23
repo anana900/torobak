@@ -107,7 +107,7 @@ def silnik_sterowanie() -> None:
 
 def pca_cleanup(port_lewo: int, port_prawo: int) -> None:
     """
-    Okropne czyszczenie - try/except powinno byc w funkcjach testowych.
+    Czyszczenie
     """
     pca.continuous_servo[port_prawo].throttle = -1
     pca.continuous_servo[port_lewo].throttle = -1
