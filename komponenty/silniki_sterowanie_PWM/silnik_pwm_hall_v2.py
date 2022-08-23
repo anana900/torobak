@@ -33,6 +33,12 @@ Złącze silnika rozpiska
 5 motor
 6 motor
 
+Magnes silnika ma 2 bieguny S i 2 bieguny N rozmieszczone naprzemiennie:
+    S
+N       N
+    S
+to sprawia że czujnik Hall'a na 1 obrót magnesu wytwarza ciąg sygnału: 0101.
+
 PROBLEM 1
 Okazuje się ze czytanie z czujnika halla jest bardzo powolne.
 Zmienia się w zaleznosci od przylozonego napiecia do ukladu sterownika.
