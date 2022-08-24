@@ -55,9 +55,14 @@ Przy zasilaniu 12V sterownik nie wspolpracuje z silnikiem 12V poprawnie. Zdarza 
 Jakby wzbudzenie. Wyłączenie zasilania na kilka s pomaga. Do sprawdzenia.
 Problem występuje też przy innych zasilaniach.
 Możliwe że to kwestia zkłeceń od silnika do sterownika. Po odsunięciu samego silnika problem ustał.
+Wzbudzenia powodowane sa rowniez zbyt niska wartoscia przyspieszenia z zakresu -1 do 1, dlatego 
+stosuje wartosci od 0 do 1.
 
 PROBLEM 3
 Niedokładność przesunięcia silnika.
+Niedokladnosc z przesunieciem silnika jest zwiazana z bezwladnoscia.
+Moznaby to SW rozwiazac, ale to doklada dodatkowy czas na ustawienie pozycji silnika.
+Na ta chwile mysle ze dokladnosc nie jest wazna.
 """
 import time
 
@@ -81,83 +86,57 @@ GPIO.setup(HALL_BCM, GPIO.IN)
 # Event do zatrzymywania pracy watkwo w przypadku ctrl+c
 event_stop = Event()
 
-def silnik_hall(zadane_obroty_lock) -> None:
-    print("Start watek HALL")
+def czujnik_hall(zadane_obroty_lock) -> None:
+    """
+    Zlicza zbocza z czujnika halla.
+    """
+    print("Watek hall start")
     global zadane_obroty
-    hall_status_aktualny = 0
-    licznik = 0
-    # Pierwsze zczytanie zmiennej globalnej
-    with zadane_obroty_lock:
-       licznik = zadane_obroty
-    while licznik > 0:
-        if licznik <=0 or event_stop.is_set():
+    hall_tick_counter = 0
+    hall_status = GPIO.input(HALL_BCM)
+    while True:
+        if event_stop.is_set():
             break
-        hall_status = GPIO.input(HALL_BCM)
-        if hall_status == 0 and hall_status_aktualny == 1:
-                hall_status_aktualny = hall_status
-                with zadane_obroty_lock:
-                    zadane_obroty -= 1
-                    licznik = zadane_obroty
-                    #print(f"licznik {licznik}")
-        elif hall_status == 1 and hall_status_aktualny == 0:
-                hall_status_aktualny = hall_status
-    print("konczymy watek HALL")
+        hall_status_now = GPIO.input(HALL_BCM)
+        if hall_status != hall_status_now:
+            hall_status =  hall_status_now
+            hall_tick_counter += 1
+            with zadane_obroty_lock:
+                zadane_obroty -= 1
+    print(f"zadane obroty {zadane_obroty} hall_counter {hall_tick_counter}")
+    print("Watek hall stop")
 
 serwo_ilosc_kanalow = 16
 pca = ServoKit(channels = serwo_ilosc_kanalow)
 
 def silnik_pwm(port_lewo: int, port_prawo: int, kierunek, zadane_obroty_lock) -> None:
-    def oblicz_przyspieszenie(obroty: int, kroki: int=10) -> list:
-        # Tworzenie tablicy przyśpieszenia
-        # Wartości muszą być dobrane pod dany silnik
-        przyspieszenie = []
-        if obroty < 20:
-            przyspieszenie = [0.1 for _ in range(obroty)]
-        else:
-            przyspieszenie = [round(0.1 * i, 1) for i in range(1, 11)]
-            przyspieszenie.extend([1 for _ in range(obroty-20)])
-            przyspieszenie.extend([round(1 - i/10, 1) for i in range(0, 10)])
-        print(f"obroty {obroty} elementy {len(przyspieszenie)} {przyspieszenie}")
-        return przyspieszenie
-
-    print("Start watek silnik")
+    print("Watek silnik start")
     global zadane_obroty
-
-    # Konfiguracja sterownika PWM w celu sterowania sterownikiem silnika DC
     min_szerokosc_pulsu_us = 0
-    max_szerokosc_pulsu_us = 1e4
+    max_szerokosc_pulsu_us = 19900  # dobrane experymentalnie
     pca.continuous_servo[port_lewo].set_pulse_width_range(min_szerokosc_pulsu_us, max_szerokosc_pulsu_us)
     pca.continuous_servo[port_prawo].set_pulse_width_range(min_szerokosc_pulsu_us, max_szerokosc_pulsu_us)
+    acceleration = [-1, -0.9, -0.8, -0.7, -0.6, -0.5, -0.4, -0.3, -0.2, -0.1, 0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
 
-    # Pierwsze zczytanie zmiennej globalnej
-    obroty = 0
-    with zadane_obroty_lock:
-        obroty = zadane_obroty
-
-    # Tablica przyspieszenia
-    przyspieszenie = oblicz_przyspieszenie(obroty)
-
-    # Pętla silnika
-    while obroty > 0:
-        with zadane_obroty_lock:
-            obroty = zadane_obroty
-        #print(f"silnik {obroty}")
-        if obroty <= 0 or event_stop.is_set():
+    acc = 0
+    while zadane_obroty > 0:
+        if event_stop.is_set():
             break
+        if zadane_obroty > 25 and acc < 0.9:
+            acc += 0.1
+        if zadane_obroty - 25 <= 0 and acc > 0:
+            acc -= 0.1
         if kierunek:
-            pca.continuous_servo[port_lewo].throttle = przyspieszenie[obroty - 1]
+            pca.continuous_servo[port_lewo].throttle = acc
         else:
-            pca.continuous_servo[port_prawo].throttle = przyspieszenie[obroty - 1]
-        # uśpienie na 1ms. Przy 12V częstotliwość zmiany sygnału z czujnika A78L ~200Hz co pozwala
-        # sprawdzić czujnik ok 5 razy zanim zmieni stan.
-        #time.sleep(0.001)
-
-    # Zatrzymywanie silnika
+            pca.continuous_servo[port_prawo].throttle = acc
     pca.continuous_servo[port_lewo].throttle = -1
     pca.continuous_servo[port_prawo].throttle = -1
-    print("konczymy watek silnik")
+    event_stop.set()
+    print(f"zadane obroty {zadane_obroty}")
+    print("Watek silnik stop")
 
-zadane_obroty = 5
+zadane_obroty = 2
 def silnik_sterowanie() -> None:
     global zadane_obroty
     kierunek = 0
@@ -165,14 +144,15 @@ def silnik_sterowanie() -> None:
     try:
         while True:
             kierunek = 0 if kierunek else 1
-            watek_silnik_czujnik_hall = Thread(target=silnik_hall, args=(zadane_obroty_lock,))
+            watek_silnik_czujnik_hall = Thread(target=czujnik_hall, args=(zadane_obroty_lock,))
             watek_silnik_pwm = Thread(target=silnik_pwm, args=(14, 15, kierunek, zadane_obroty_lock,))
             watek_silnik_czujnik_hall.start()
             watek_silnik_pwm.start()
             watek_silnik_czujnik_hall.join()
             watek_silnik_pwm.join()
-            time.sleep(2)
-            zadane_obroty = 5
+            time.sleep(1)
+            event_stop.clear()
+            zadane_obroty = 2
     except KeyboardInterrupt:
         print("Zakonczenie poprzez ctrl+c")
         event_stop.set()

@@ -63,35 +63,32 @@ def test_silnik_dc_2_throttle(port_lewo: int, port_prawo: int,
     bezwladnosc_czasowa_s = 0.075
     # throttle akceptuje wartosci od -1.0 do 1.0, ale na cele uzycia w range zmieniam skale
     # od -10 do +10 z krokiem 1
-    przyspieszenie_start = 0    # -10 - 10
+    przyspieszenie_start = 2    # -10 - 10
     przyspieszenie_stop = 10    # -10 - 10
-    przyspieszenie_krok = 2     # > 0
+    przyspieszenie_krok = 1     # > 0
     przyspieszenie_dzielnik = 10
     while True:
         for i in range(przyspieszenie_start, przyspieszenie_stop+1, przyspieszenie_krok):
             # Petla przyspieszenia lewo
             pca.continuous_servo[port_lewo].throttle = i/przyspieszenie_dzielnik
             time.sleep(bezwladnosc_czasowa_s)
-        time.sleep(1)
         for i in range(przyspieszenie_stop, przyspieszenie_start-1, -przyspieszenie_krok):
             # Petla przyspieszenia lewo
             pca.continuous_servo[port_lewo].throttle = i/przyspieszenie_dzielnik
             time.sleep(bezwladnosc_czasowa_s)
         pca.continuous_servo[port_lewo].throttle = -1
         print("Lewo ok")
-        #time.sleep(1)
+
         for i in range(przyspieszenie_start, przyspieszenie_stop+1, przyspieszenie_krok):
             # Petla przyspieszenia prawo
             pca.continuous_servo[port_prawo].throttle = i/przyspieszenie_dzielnik
             time.sleep(bezwladnosc_czasowa_s)
-        time.sleep(1)
         for i in range(przyspieszenie_stop, przyspieszenie_start-1, -przyspieszenie_krok):
             # Petla przyspieszenia lewo
             pca.continuous_servo[port_prawo].throttle = i/przyspieszenie_dzielnik
             time.sleep(bezwladnosc_czasowa_s)
-        print("Prawo ok")
         pca.continuous_servo[port_prawo].throttle = -1
-        #time.sleep(1)
+        print("Prawo ok")
 
 def pca_cleanup(port_lewo: int, port_prawo: int):
     """
