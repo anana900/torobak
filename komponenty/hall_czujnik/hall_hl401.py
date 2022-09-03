@@ -69,6 +69,7 @@ def test_generator():
     """
     Test z generatorem sygnału.
     Zlicznie impulsów generatora przez zadany okres czasu.
+    Ustawienie generatora z OWON 200Hz, Aplituda 3vpp, Offset 0.
     Dla 1s przy czestotliwości generatora 1kH powinno wyjść 1000 impulsów.
     Najpierw uruchamiany jest generator pootem program.
     Wyniki pomiarow dla prostokątnego sygnału dla 10 prób:
@@ -90,7 +91,6 @@ def test_generator():
             licznik += 1
         elif hall_status == 1 and hall_status_aktualny == 0:
             hall_status_aktualny = hall_status
-
     print(f"zliczone impulsy:{licznik} czas: {time.time_ns() - timer_start_ns} [ns]")
 
 if __name__=='__main__':

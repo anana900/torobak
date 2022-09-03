@@ -63,6 +63,7 @@ Niedokładność przesunięcia silnika.
 Niedokladnosc z przesunieciem silnika jest zwiazana z bezwladnoscia.
 Moznaby to SW rozwiazac, ale to doklada dodatkowy czas na ustawienie pozycji silnika.
 Na ta chwile mysle ze dokladnosc nie jest wazna.
+Problem powiazany z szybkim obracaniem i bezwladnoscia. Dla -0.4 silnik obraca sie poprawna ilosc razy.
 """
 import time
 
@@ -81,17 +82,22 @@ pca = ServoKit(channels = serwo_ilosc_kanalow)
 
 # Konfiguracja do czujnika HALL
 HALL_BCM = 21
-GPIO.setup(HALL_BCM, GPIO.IN)
+#GPIO.setup(HALL_BCM, GPIO.IN)
+GPIO.setup(HALL_BCM, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
 # Event do zatrzymywania pracy watkwo w przypadku ctrl+c
 event_stop = Event()
 
-def czujnik_hall(zadane_obroty_lock) -> None:
+# Konfiguracje do serva
+serwo_ilosc_kanalow = 16
+pca = ServoKit(channels = serwo_ilosc_kanalow)
+
+def czujnik_hall(zadane_zbocza_lock) -> None:
     """
     Zlicza zbocza z czujnika halla.
     """
     print("Watek hall start")
-    global zadane_obroty
+    global zadane_zbocza
     hall_tick_counter = 0
     hall_status = GPIO.input(HALL_BCM)
     while True:
@@ -101,58 +107,83 @@ def czujnik_hall(zadane_obroty_lock) -> None:
         if hall_status != hall_status_now:
             hall_status =  hall_status_now
             hall_tick_counter += 1
-            with zadane_obroty_lock:
-                zadane_obroty -= 1
-    print(f"zadane obroty {zadane_obroty} hall_counter {hall_tick_counter}")
+            with zadane_zbocza_lock:
+                zadane_zbocza -= 1
+    print(f"zadane zbocza {zadane_zbocza} hall_counter {hall_tick_counter}")
     print("Watek hall stop")
 
-serwo_ilosc_kanalow = 16
-pca = ServoKit(channels = serwo_ilosc_kanalow)
+def przyspieszenie(xlimit: int, x: int) -> float:
+    a, b, c, d, e, f = 5, 10, 15, 20, 25, 30
+    acc_table = {0: 5, 0.1: 10, 0.2: 15, 0.3: 20, 0.5: 25, 0.7: 30}
+    acc = -1
+    if x <= a or xlimit-x <= a:
+        acc = 0
+    elif a < x <= b or a < xlimit-x <= b:
+        acc = 0.1
+    elif b < x <= c or b < xlimit-x <= c:
+        acc = 0.2
+    elif c < x <= d or c < xlimit-x <= d:
+        acc = 0.3
+    elif d < x <= e or d < xlimit-x <= e:
+        acc = 0.5
+    elif e < x <= f or e < xlimit-x <= f:
+        acc = 0.7
+    elif x > f:
+        acc = 1
+    else:
+        raise(f"This should not happen. Acc cannot be calculated. x: {x} xlimit: {xlimit}")
+    return acc
 
-def silnik_pwm(port_lewo: int, port_prawo: int, kierunek, zadane_obroty_lock) -> None:
+def silnik_pwm(port_lewo: int, port_prawo: int, kierunek, zadane_zbocza_lock) -> None:
     print("Watek silnik start")
-    global zadane_obroty
+    global zadane_zbocza
     min_szerokosc_pulsu_us = 0
     max_szerokosc_pulsu_us = 19900  # dobrane experymentalnie
     pca.continuous_servo[port_lewo].set_pulse_width_range(min_szerokosc_pulsu_us, max_szerokosc_pulsu_us)
     pca.continuous_servo[port_prawo].set_pulse_width_range(min_szerokosc_pulsu_us, max_szerokosc_pulsu_us)
-    acceleration = [-1, -0.9, -0.8, -0.7, -0.6, -0.5, -0.4, -0.3, -0.2, -0.1, 0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
 
-    acc = 0
-    while zadane_obroty > 0:
+    acc = -1
+    licznik_zbocza = -1
+    with zadane_zbocza_lock:
+        limit = zadane_zbocza
+        licznik_zbocza = zadane_zbocza
+    while licznik_zbocza > 0:
         if event_stop.is_set():
             break
-        if zadane_obroty > 25 and acc < 0.9:
-            acc += 0.1
-        if zadane_obroty - 25 <= 0 and acc > 0:
-            acc -= 0.1
+        acc = przyspieszenie(limit, zadane_zbocza)
         if kierunek:
             pca.continuous_servo[port_lewo].throttle = acc
         else:
             pca.continuous_servo[port_prawo].throttle = acc
+        with zadane_zbocza_lock:
+            licznik_zbocza = zadane_zbocza
     pca.continuous_servo[port_lewo].throttle = -1
     pca.continuous_servo[port_prawo].throttle = -1
     event_stop.set()
-    print(f"zadane obroty {zadane_obroty}")
+    print(f"zadane zbocza {zadane_zbocza}")
     print("Watek silnik stop")
 
-zadane_obroty = 2
+_ile = 10
+zadane_zbocza = _ile
 def silnik_sterowanie() -> None:
-    global zadane_obroty
+    global zadane_zbocza
     kierunek = 0
-    zadane_obroty_lock = Lock()
+    zadane_zbocza_lock = Lock()
     try:
         while True:
             kierunek = 0 if kierunek else 1
-            watek_silnik_czujnik_hall = Thread(target=czujnik_hall, args=(zadane_obroty_lock,))
-            watek_silnik_pwm = Thread(target=silnik_pwm, args=(14, 15, kierunek, zadane_obroty_lock,))
+            watek_silnik_czujnik_hall = Thread(target=czujnik_hall, args=(zadane_zbocza_lock,))
+            watek_silnik_pwm = Thread(target=silnik_pwm, args=(14, 15, kierunek, zadane_zbocza_lock,))
+            #watek_zliczanie = Thread(target=zliczanie, args=(zadane_zbocza_lock,))
             watek_silnik_czujnik_hall.start()
             watek_silnik_pwm.start()
+            #watek_zliczanie.start()
             watek_silnik_czujnik_hall.join()
             watek_silnik_pwm.join()
+            #watek_zliczanie.join()
             time.sleep(1)
             event_stop.clear()
-            zadane_obroty = 2
+            zadane_zbocza = _ile
     except KeyboardInterrupt:
         print("Zakonczenie poprzez ctrl+c")
         event_stop.set()
